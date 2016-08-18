@@ -1,0 +1,44 @@
+{
+  "name": "roadwork-authentication",
+  "version": "0.1.0",
+  "description": "Adds authentication to the roadwork library",
+  "homepage": "https://github.com/thebillkidy/roadwork-authentication",
+  "bugs": "https://github.com/thebillkidy/roadwork-authentication/issues",
+  "author": "Xavier Geerinck",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/thebillkidy/roadwork-authentication.git"
+  },
+  "keywords": [
+    "bookshelf",
+    "knex",
+    "hapi.js",
+    "node",
+    "REST",
+    "API"
+  ],
+  "peerDependencies": {
+    "bookshelf": "^0.10.0"
+  },
+  "dependencies": {
+    "bluebird": "^3.4.1",
+    "bookshelf": "^0.10.0",
+    "boom": "^3.2.2",
+    "hapi-auth-bearer-simple": "^5.0.1",
+    "hapi-auth-bearer-token": "^4.2.1",
+    "joi": "^9.0.4",
+    "knex": "^0.11.10",
+    "pluralize": "^3.0.0"
+  },
+  "devDependencies": {
+    "code": "^3.0.2",
+    "hapi": "^14.1.0",
+    "lab": "^10.9.0",
+    "sinon": "^1.17.5"
+  },
+  "scripts": {
+    "test": "lab -t 100",
+    "test-cov-html": "lab -r html -o coverage.html"
+  },
+  "main": "src/index.js"
+}
