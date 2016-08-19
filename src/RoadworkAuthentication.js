@@ -23,6 +23,13 @@ RoadworkAuthentication.prototype.getStrategyName = function () {
  * Check if we can connect to the database
  * @returns boolean
  */
+RoadworkAuthentication.prototype.canConnect = function () {
+
+};
+
+/**
+ * Connects to the database
+ */
 RoadworkAuthentication.prototype.connect = function () {
 
 };
@@ -38,11 +45,10 @@ RoadworkAuthentication.prototype.createRequiredTables = function () {
 
 /**
  * The validate function to be used to see if a user has access to a specific route
+ * @param token
+ * @param callback(err, isValid, credentials)
  */
 RoadworkAuthentication.prototype.validateFunction = function (token, callback) {
-    // The object request
-    const request = this;
-
     UserSessionModel
     .where({ token: token })
     .fetch()
@@ -76,14 +82,26 @@ RoadworkAuthentication.prototype.hasAccessToTable = function (userId, table) {
  * Create the implementation to be used in the hapi framework
  */
 RoadworkAuthentication.prototype.getHapiFrameworkInterface = function () {
-    var HapiInterface = require('./adapters/hapi-interface');
-    var hapiInterface = new HapiInterface(this.server, this.strategyName, this.validateFunction);
+    //var HapiInterface = require('./adapters/hapi-interface');
+    //var hapiInterface = new HapiInterface(this.server, this.strategyName, this.validateFunction);
     var self = this;
 
     var register = (server, options, next) => {
         server.auth.scheme(this.strategyName, (server, options) => {
             return {
-                authenticate: self.validateBearerToken
+                authenticate: (request, reply) => {
+                    const queryParams = request.query;
+                    const headers = request.headers;
+
+                    // Validate the bearer token for Hapi
+                    self.validateBearerToken(headers, queryParams, (err, credentials) => {
+                        if (err) {
+                            return reply(err);
+                        }
+
+                        return reply.continue({ credentials });
+                    });
+                }
             }
         });
 
@@ -96,70 +114,75 @@ RoadworkAuthentication.prototype.getHapiFrameworkInterface = function () {
 
     return register;
 
-    return require('./adapters/hapi-interface');
-    //return require('hapi-auth-bearer-token');
+    // TODO: Put it in the adapter
+    //return require('./adapters/hapi-interface');
 };
 
-RoadworkAuthentication.prototype.validateBearerToken = (request, reply) => {
+/**
+ * Validates the headers and queryParams its access_token. This can be passed in the header through:
+ * Authorization: Bearer <token>
+ *
+ * or in the query through:
+ * ?access_token=<token>
+ *
+ * the rules of parsing: QueryParameters > Authorization Header
+ *
+ * @param headers
+ * @param queryParams
+ * @param callback(err, credentialsObject)
+ * @returns {*}
+ */
+RoadworkAuthentication.prototype.validateBearerToken = function (headers, queryParams, callback) {
     var self = this;
 
-    let token = '';
+    let bearerToken = '';
 
-    if (request.query.access_token) {
-        token = request.query.access_token;
-        delete request.query.access_token;
+    if (queryParams.access_token) {
+        bearerToken = queryParams.access_token;
+        //delete queryParams.access_token;
     }
-    else if (request.headers.authorization && request.headers.authorization !== undefined) {
-        const headerParts = request.headers.authorization.split(' ');
+    else if (headers.authorization && headers.authorization !== undefined) {
+        const headerParts = headers.authorization.split(' ');
 
         if (headerParts[0].toLowerCase() !== 'bearer') {
-            return reply(Boom.unauthorized(null, this.strategyName));
+            return callback(Boom.unauthorized(null, this.strategyName));
         }
 
-        token = headerParts[1];
+        bearerToken = headerParts[1];
     }
     else {
-        return reply(Boom.unauthorized(null, this.strategyName), null, {});
+        return callback(Boom.unauthorized(null, this.strategyName));
     }
 
-    // use provided validate function to return
-    if (settings.exposeRequest) {
-        return self.validateFunction.call(request, token, (err, isValid, credentials) => {
-            return internals.validateCallback(err, isValid, credentials, token, reply);
-        });
-    }
-
-    return self.validateFunction(token, (err, isValid, credentials) => {
-        return internals.validateCallback(err, isValid, credentials, token, reply);
+    return self.validateFunction(bearerToken, (err, isValid, credentials) => {
+        //console.log(err);
+        //console.log(isValid);
+        //console.log(credentials);
+        return self.validateCallback(err, isValid, credentials, bearerToken, callback);
     });
 };
 
-var internals = {};
-internals.validateCallback = (err, isValid, credentials, token, reply) => {
+RoadworkAuthentication.prototype.validateCallback = function (err, isValid, credentials, token, callback) {
     credentials = credentials || null;
 
     if (err) {
-        return reply(err, null, { credentials });
+        return callback(err, credentials);
     }
 
     if (!isValid) {
-        return reply(Boom.unauthorized(null, this.strategyName, {
+        return callback(Boom.unauthorized(null, this.strategyName, {
             isValid,
             credentials
-        }), null, { credentials });
+        }), credentials);
     }
 
-    if (!credentials ||
-        typeof credentials !== 'object') {
-
-        return reply(Boom.badImplementation('Bad credentials object received for bearerAuth auth validation'));
+    if (!credentials || typeof credentials !== 'object') {
+        return callback(Boom.badImplementation('Bad credentials object received for bearerAuth auth validation'));
     }
 
     credentials.token = token;
 
-    return reply.continue({
-        credentials
-    });
+    return callback(null, credentials);
 };
 
 module.exports = RoadworkAuthentication;
