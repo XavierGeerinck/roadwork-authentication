@@ -1,18 +1,24 @@
-var Promise = require('bluebird');
-var Boom = require('boom');
+const Promise = require('bluebird');
+const Boom = require('boom');
+const dbUtil = require('./db/utils/dbUtil');
+const pluralize = require('pluralize');
 
-var RoadworkAuthentication = function (server, dbConfig) {
+var RoadworkAuthentication = function (server, bookshelf) {
     if (!server) {
-        throw new Error('Incorrect library');
+        throw new Error('Missing the http engine');
     }
 
-    if (!dbConfig) {
-        throw new Error('Missing database connection configuration');
+    if (!bookshelf) {
+        throw new Error('Missing the bookshelf object');
     }
 
     this.server = server;
-    this.dbConfig = dbConfig;
     this.strategyName = 'roadwork-authentication-bearer';
+    this.bookshelf = bookshelf;
+
+    this.models = [];
+    this.models.UserModel = require('./db/models/User')(this.bookshelf);
+    this.models.UserSessionModel = require('./db/models/UserSession')(this.bookshelf);
 };
 
 RoadworkAuthentication.prototype.getStrategyName = function () {
@@ -20,27 +26,73 @@ RoadworkAuthentication.prototype.getStrategyName = function () {
 };
 
 /**
- * Check if we can connect to the database
+ * Check if the required tables and columns exist in the database. These are:
+ * user
+ *     - id
+ * user_session
+ *     - user_id
+ *     - token
+ *
+ * The non existent tables will be created by the system
  * @returns boolean
  */
-RoadworkAuthentication.prototype.canConnect = function () {
+RoadworkAuthentication.prototype.checkRequiredScheme = function () {
+    return new Promise((resolve, reject) => {
+        // Create the user table if needed or if it has missing columns
+        this.bookshelf.knex.schema.hasTable('user')
+        .then((exists) => {
+            if (exists) {
+                console.info('[x] User table exists');
+                return this.checkUserTableScheme();
+            }
 
-};
+            console.info('[x] Creating User table');
+            return this.createUserTable();
+        })
+        // Create the user_session table if needed or if it has missing columns
+        .then(() => {
+            console.info('[x] User table required columns exist');
+            return this.bookshelf.knex.schema.hasTable('user_session');
+        })
+        .then((exists) => {
+            if (exists) {
+                console.info('[x] UserSession table exists');
+                return this.checkUserSessionScheme();
+            }
 
-/**
- * Connects to the database
- */
-RoadworkAuthentication.prototype.connect = function () {
-
-};
-
-/**
- * Create the required tables for the library to function
- */
-RoadworkAuthentication.prototype.createRequiredTables = function () {
-    return new Promise(function (resolve, reject) {
-        return resolve();
+            console.info('[x] Creating UserSession table');
+            return this.createUserSessionTable();
+        })
+        .then(() => {
+            console.info('[x] UserSession table required columns exist');
+            return resolve();
+        })
+        .catch((err) => {
+            return reject(err);
+        });
     });
+};
+
+RoadworkAuthentication.prototype.checkUserTableScheme = function () {
+    var tableName = 'user';
+    var requiredColumns = [ 'id' ];
+
+    return dbUtil.columnsExist(this.bookshelf.knex, tableName, requiredColumns);
+};
+
+RoadworkAuthentication.prototype.checkUserSessionScheme = function () {
+    var tableName = 'user_session';
+    var requiredColumns = [ 'user_id', 'token' ];
+
+    return dbUtil.columnsExist(this.bookshelf.knex, tableName, requiredColumns);
+};
+
+RoadworkAuthentication.prototype.createUserTable = function () {
+    return dbUtil.createTableByScheme(this.bookshelf.knex, require('./db/schemas/user'), 'user');
+};
+
+RoadworkAuthentication.prototype.createUserSessionTable = function () {
+    return dbUtil.createTableByScheme(this.bookshelf.knex, require('./db/schemas/user_session'), 'user_session');
 };
 
 /**
@@ -49,7 +101,9 @@ RoadworkAuthentication.prototype.createRequiredTables = function () {
  * @param callback(err, isValid, credentials)
  */
 RoadworkAuthentication.prototype.validateFunction = function (token, callback) {
-    UserSessionModel
+    var self = this;
+
+    this.models.UserSessionModel
     .where({ token: token })
     .fetch()
     .then(function (userSession) {
@@ -57,7 +111,7 @@ RoadworkAuthentication.prototype.validateFunction = function (token, callback) {
             return Promise.reject(Boom.badRequest('INVALID_TOKEN'));
         }
 
-        return UserModel.where({ id: userSession.get('user_id') }).fetch();
+        return self.models.UserModel.where({ id: userSession.get('user_id') }).fetch();
     })
     .then(function (user) {
         if (!user) {
@@ -66,6 +120,7 @@ RoadworkAuthentication.prototype.validateFunction = function (token, callback) {
 
         var userObj = user;
         userObj.scope = [ user.get('scope') ];
+        userObj.scope.push('user-' + userObj.id);
 
         return callback(null, true, userObj);
     })
@@ -78,44 +133,33 @@ RoadworkAuthentication.prototype.hasAccessToTable = function (userId, table) {
     return true;
 };
 
+RoadworkAuthentication.prototype.getTableRowOwner = function (table, rowId) {
+    // If it's the main user table, return the id
+    if (table === 'user') {
+        return Promise.resolve(rowId);
+    } else {
+        return new Promise((resolve, reject) => {
+            this.bookshelf.knex.select('user_id').from(table).where('id', rowId)
+            .then((result) => {
+                if (!result || result.length == 0) {
+                    return resolve(null);
+                }
+
+                return resolve(result[0].user_id);
+            });
+        });
+    }
+};
+
+RoadworkAuthentication.prototype.getModelByPath = function (path) {
+
+};
+
 /**
  * Create the implementation to be used in the hapi framework
  */
 RoadworkAuthentication.prototype.getHapiFrameworkInterface = function () {
-    //var HapiInterface = require('./adapters/hapi-interface');
-    //var hapiInterface = new HapiInterface(this.server, this.strategyName, this.validateFunction);
-    var self = this;
-
-    var register = (server, options, next) => {
-        server.auth.scheme(this.strategyName, (server, options) => {
-            return {
-                authenticate: (request, reply) => {
-                    const queryParams = request.query;
-                    const headers = request.headers;
-
-                    // Validate the bearer token for Hapi
-                    self.validateBearerToken(headers, queryParams, (err, credentials) => {
-                        if (err) {
-                            return reply(err);
-                        }
-
-                        return reply.continue({ credentials });
-                    });
-                }
-            }
-        });
-
-        return next();
-    };
-
-    register.attributes = {
-        pkg: require(process.cwd() + '/package.json')
-    };
-
-    return register;
-
-    // TODO: Put it in the adapter
-    //return require('./adapters/hapi-interface');
+    return require('./adapters/hapi-interface')(this);
 };
 
 /**
