@@ -25,7 +25,7 @@ describe('Module', () => {
         try {
             const Api = new RoadWorkAuthentication();
         } catch (err) {
-            expect(err.message).to.equal('Incorrect library');
+            expect(err.message).to.equal('Missing the http engine');
         }
 
         done();
@@ -35,7 +35,7 @@ describe('Module', () => {
         try {
             const Api = new RoadWorkAuthentication(server);
         } catch (err) {
-            expect(err.message).to.equal('Missing database connection configuration');
+            expect(err.message).to.equal('Missing the bookshelf object');
         }
 
         done();

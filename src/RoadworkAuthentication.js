@@ -133,6 +133,24 @@ RoadworkAuthentication.prototype.hasAccessToTable = function (userId, table) {
     return true;
 };
 
+RoadworkAuthentication.prototype.hasAccess = function (request, rolesAllowed, model) {
+    var self = this;
+
+    return new Promise((resolve, reject) => {
+        let credentials = request.auth.credentials;
+        let rowId = request.path.split('/')[2];
+
+        self.getTableRowOwner(model.getTableName(), rowId)
+        .then((ownerId) => {
+            if (credentials && ownerId === credentials.get('id')) {
+                return resolve(true);
+            }
+
+            return resolve(false);
+        });
+    });
+};
+
 RoadworkAuthentication.prototype.getTableRowOwner = function (table, rowId) {
     // If it's the main user table, return the id
     if (table === 'user') {
