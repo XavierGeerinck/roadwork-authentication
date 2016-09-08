@@ -103,7 +103,8 @@ RoadworkAuthentication.prototype.createUserSessionTable = function () {
 RoadworkAuthentication.prototype.validateFunction = function (token, callback) {
     var self = this;
 
-    this.models.UserSessionModel
+    this.models
+    .UserSessionModel
     .where({ token: token })
     .fetch()
     .then(function (userSession) {
@@ -127,10 +128,6 @@ RoadworkAuthentication.prototype.validateFunction = function (token, callback) {
     .catch(function (err) {
         return callback(err);
     });
-};
-
-RoadworkAuthentication.prototype.hasAccessToTable = function (userId, table) {
-    return true;
 };
 
 RoadworkAuthentication.prototype.hasAccess = function (request, rolesAllowed, model) {
@@ -167,10 +164,6 @@ RoadworkAuthentication.prototype.getTableRowOwner = function (table, rowId) {
             });
         });
     }
-};
-
-RoadworkAuthentication.prototype.getModelByPath = function (path) {
-
 };
 
 /**
