@@ -1,6 +1,6 @@
 'use strict';
 
-var stringUtil = require('../utils/stringUtils');
+const stringUtil = require('roadwork-utils').string;
 
 class UserSessionService {
     constructor (models) {

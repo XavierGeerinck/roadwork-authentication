@@ -1,6 +1,6 @@
 {
   "name": "roadwork-authentication",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Adds authentication to the roadwork library",
   "homepage": "https://github.com/thebillkidy/roadwork-authentication",
   "bugs": "https://github.com/thebillkidy/roadwork-authentication/issues",
@@ -28,7 +28,8 @@
     "hoek": "^4.0.2",
     "joi": "^9.0.4",
     "knex": "^0.11.10",
-    "pluralize": "^3.0.0"
+    "pluralize": "^3.0.0",
+    "roadwork-utils": "^0.1.0"
   },
   "devDependencies": {
     "code": "^3.0.2",
