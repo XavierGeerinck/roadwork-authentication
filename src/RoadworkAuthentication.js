@@ -16,13 +16,53 @@ var RoadworkAuthentication = function (server, bookshelf) {
     this.strategyName = 'roadwork-authentication-bearer';
     this.bookshelf = bookshelf;
 
-    this.models = [];
+    this.models = {};
     this.models.UserModel = require('./db/models/User')(this.bookshelf);
     this.models.UserSessionModel = require('./db/models/UserSession')(this.bookshelf);
+
+    this.controllers = {};
+    this.controllers.AuthController = require('./controllers/AuthController')(this.models);
 };
 
 RoadworkAuthentication.prototype.getStrategyName = function () {
     return this.strategyName;
+};
+
+/**
+ * Registers the routes of a passed require() routes file to the engine
+ * @param routesFile
+ */
+RoadworkAuthentication.prototype.addRoute = function (routesFile) {
+    var self = this;
+    console.log(routesFile);
+    for (var route in routesFile) {
+        console.info('[x] route: ' + routesFile[route].method + ' ' + routesFile[route].path);
+        self.server.route(routesFile[route]);
+    }
+};
+
+/**
+ * Init the library, this will perform some checks, and also init some pre-existing functionality such as the login routes
+ */
+RoadworkAuthentication.prototype.init = function () {
+    var self = this;
+
+    console.log('===========================================');
+    console.log('Initializing Roadwork Authentication Plugin');
+    console.log('===========================================');
+    console.log('Checking the required scheme');
+    return self.checkRequiredScheme()
+    .then(() => {
+        console.log('Adding routes');
+        // Add routes
+        self.addRoute(require('./routes/auth')(self.controllers.AuthController));
+
+
+        return Promise.resolve();
+    })
+    .catch((err) => {
+        return Promise.reject(err);
+    });
 };
 
 /**
@@ -37,39 +77,37 @@ RoadworkAuthentication.prototype.getStrategyName = function () {
  * @returns boolean
  */
 RoadworkAuthentication.prototype.checkRequiredScheme = function () {
-    return new Promise((resolve, reject) => {
-        // Create the user table if needed or if it has missing columns
-        this.bookshelf.knex.schema.hasTable('user')
-        .then((exists) => {
-            if (exists) {
-                console.info('[x] User table exists');
-                return this.checkUserTableScheme();
-            }
+    // Create the user table if needed or if it has missing columns
+    return this.bookshelf.knex.schema.hasTable('user')
+    .then((exists) => {
+        if (exists) {
+            console.info('[x] User table exists');
+            return this.checkUserTableScheme();
+        }
 
-            console.info('[x] Creating User table');
-            return this.createUserTable();
-        })
-        // Create the user_session table if needed or if it has missing columns
-        .then(() => {
-            console.info('[x] User table required columns exist');
-            return this.bookshelf.knex.schema.hasTable('user_session');
-        })
-        .then((exists) => {
-            if (exists) {
-                console.info('[x] UserSession table exists');
-                return this.checkUserSessionScheme();
-            }
+        console.info('[x] Creating User table');
+        return this.createUserTable();
+    })
+    // Create the user_session table if needed or if it has missing columns
+    .then(() => {
+        console.info('[x] User table required columns exist');
+        return this.bookshelf.knex.schema.hasTable('user_session');
+    })
+    .then((exists) => {
+        if (exists) {
+            console.info('[x] UserSession table exists');
+            return this.checkUserSessionScheme();
+        }
 
-            console.info('[x] Creating UserSession table');
-            return this.createUserSessionTable();
-        })
-        .then(() => {
-            console.info('[x] UserSession table required columns exist');
-            return resolve();
-        })
-        .catch((err) => {
-            return reject(err);
-        });
+        console.info('[x] Creating UserSession table');
+        return this.createUserSessionTable();
+    })
+    .then(() => {
+        console.info('[x] UserSession table required columns exist');
+        return Promise.resolve();
+    })
+    .catch((err) => {
+        return Promise.reject(err);
     });
 };
 
