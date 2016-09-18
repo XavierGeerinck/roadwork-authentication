@@ -175,9 +175,9 @@ RoadworkAuthentication.prototype.hasAccess = function (request, rolesAllowed, mo
         let credentials = request.auth.credentials;
         let rowId = request.path.split('/')[2];
 
-        self.getTableRowOwner(model.getTableName(), rowId)
+        self.getTableRowOwner(model.tableName, rowId)
         .then((ownerId) => {
-            if (credentials && ownerId === credentials.get('id')) {
+            if (credentials && parseInt(ownerId) === parseInt(credentials.get('id'))) {
                 return resolve(true);
             }
 
