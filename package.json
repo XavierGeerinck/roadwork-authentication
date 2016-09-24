@@ -1,6 +1,6 @@
 {
   "name": "roadwork-authentication",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Adds authentication to the roadwork library",
   "homepage": "https://github.com/thebillkidy/roadwork-authentication",
   "bugs": "https://github.com/thebillkidy/roadwork-authentication/issues",
