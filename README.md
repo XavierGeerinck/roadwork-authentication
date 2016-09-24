@@ -87,6 +87,3 @@ npm install sqlite3 --save
 
 ### createRequiredTables()
 Check if the required tables and columns exist and create them if needed. This returns a promise since it happens async
-
-### getStrategyName() 
-Returns the strategyName that we will use to register the route authentication strategy with

@@ -3,8 +3,14 @@ const Boom = require('boom');
 const dbUtil = require('./db/utils/dbUtil');
 const pluralize = require('pluralize');
 
+let instance = null;
+
 class RoadworkAuthentication {
     constructor (server, bookshelf) {
+        if (!instance) {
+            instance = this;
+        }
+
         if (!server) {
             throw new Error('Missing the http engine');
         }
@@ -23,10 +29,8 @@ class RoadworkAuthentication {
 
         this.controllers = {};
         this.controllers.AuthController = require('./controllers/AuthController')(this.models);
-    }
 
-    getStrategyName () {
-        return this.strategyName;
+        return instance;
     }
 
     /**
@@ -160,7 +164,10 @@ class RoadworkAuthentication {
 
                 var userObj = user;
                 userObj.scope = [ user.get('scope') ];
-                userObj.scope.push('user-' + userObj.id);
+
+                // Add the $owner role to the scope array, note that this is needed to get access to $owner rolesAllowed routes
+                userObj.scope.push('$owner');
+                // userObj.scope.push('user-' + userObj.id);
 
                 return callback(null, true, userObj);
             })
@@ -169,21 +176,26 @@ class RoadworkAuthentication {
             });
     }
 
-    hasAccess (request, rolesAllowed, model) {
+    hasAccessToRow (request, rolesAllowed, model) {
         var self = this;
 
         return new Promise((resolve, reject) => {
             let credentials = request.auth.credentials;
+
+            if (!request.path || !request.path.split('/') || !request.path.split('/')[2]) {
+                return resolve(false);
+            }
+
             let rowId = request.path.split('/')[2];
 
             self.getTableRowOwner(model.tableName, rowId)
-                .then((ownerId) => {
-                    if (credentials && parseInt(ownerId) === parseInt(credentials.get('id'))) {
-                        return resolve(true);
-                    }
+            .then((ownerId) => {
+                if (credentials && parseInt(ownerId) === parseInt(credentials.get('id'))) {
+                    return resolve(true);
+                }
 
-                    return resolve(false);
-                });
+                return resolve(false);
+            });
         });
     }
 

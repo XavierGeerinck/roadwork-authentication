@@ -43,7 +43,7 @@ describe('Module', () => {
 
     it('should return the strategyName when asked', (done) => {
         const Api = new RoadWorkAuthentication(server, {});
-        expect(Api.getStrategyName()).to.equal('roadwork-authentication-bearer');
+        expect(Api.strategyName).to.equal('roadwork-authentication-bearer');
 
         done();
     });
